@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FieldSense — Crop & Weed Detection</title>
+<meta name="description" content="Upload a field image and detect crops and weeds, map weed pressure and plan spot spraying.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232f7d4a'/><path d='M16 25V12m0 0c0-4 3-6 7-6 0 4-3 6-7 6zm0 4c0-3-2.500-5-6-5 0 3 2.500 5 6 5z' stroke='white' stroke-width='2' fill='none' stroke-linecap='round'/></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="#top">
+      <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#2f7d4a"/><path d="M16 25V12m0 0c0-4 3-6 7-6 0 4-3 6-7 6zm0 4c0-3-2.5-5-6-5 0 3 2.500 5 6 5z" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+      FieldSense
+    </a>
+    <nav>
+      <a href="#detect">Detect</a>
+      <a href="#history">History</a>
+      <a href="#how">How it works</a>
+    </nav>
+    <div class="nav-stats" id="navStats" title="Totals across all saved scans"></div>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero wrap">
+    <p class="eyebrow">Precision agriculture · Computer vision</p>
+    <h1>See every weed<br>before it costs you yield.</h1>
+    <p class="lede">Drop in a top-down field photo. FieldSense separates crop from weed, maps where weeds are concentrated and shows how much herbicide spot-spraying could save.</p>
+  </section>
+
+  <section class="wrap tool" id="detect">
+    <aside class="panel controls">
+      <div class="drop" id="drop" tabindex="0" role="button" aria-label="Upload field image">
+        <input type="file" id="file" accept="image/*" hidden>
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0L7.500 8.500M12 4l4.500 4.500"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+        <strong>Drop a field image</strong>
+        <span>or click to browse · JPG, PNG, WEBP</span>
+      </div>
+      <button class="btn ghost full" id="sampleBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.700"/><path d="M21 4v5h-5"/></svg>
+        Try a sample field
+      </button>
+
+      <div class="group">
+        <h3>Detection settings</h3>
+        <label class="field">
+          <span>Mode <em class="hint" title="Auto uses crop-row geometry when rows are visible, otherwise size & shape.">?</em></span>
+          <div class="seg" id="modeSeg">
+            <button data-v="auto" class="on">Auto</button>
+            <button data-v="rows">Rows</button>
+            <button data-v="size">Size</button>
+          </div>
+        </label>
+        <label class="field">
+          <span>Sensitivity <output id="sensOut">50</output></span>
+          <input type="range" id="sens" min="0" max="100" value="50">
+          <small>Higher finds more small weeds (and more false positives).</small>
+        </label>
+        <label class="field">
+          <span>Min. plant size <output id="areaOut">60 px</output></span>
+          <input type="range" id="area" min="20" max="400" step="10" value="60">
+          <small>Ignore specks smaller than this.</small>
+        </label>
+      </div>
+
+      <div class="group">
+        <h3>Layers</h3>
+        <div class="toggles" id="toggles">
+          <label class="chip"><input type="checkbox" data-layer="crop" checked><i style="--c:#2fa866"></i>Crops</label>
+          <label class="chip"><input type="checkbox" data-layer="weed" checked><i style="--c:#e4572e"></i>Weeds</label>
+          <label class="chip"><input type="checkbox" data-layer="boxes" checked><i style="--c:#14231a"></i>Boxes</label>
+          <label class="chip"><input type="checkbox" data-layer="heat"><i style="--c:#f59e0b"></i>Weed heatmap</label>
+          <label class="chip"><input type="checkbox" data-layer="mask"><i style="--c:#40d6ff"></i>Vegetation mask</label>
+        </div>
+      </div>
+    </aside>
+
+    <div class="viewer-col">
+      <div class="panel viewer-card">
+        <div class="viewer-bar">
+          <div class="title" id="viewTitle">No image yet</div>
+          <div class="bar-actions">
+            <button class="btn small ghost" id="holdBtn" disabled title="Hold to see the original image">Hold to compare</button>
+            <button class="btn small ghost" id="pngBtn" disabled>Save image</button>
+          </div>
+        </div>
+        <div class="stage-wrap">
+          <div class="empty" id="empty">
+            <svg width="64" height="64" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 50h48M14 50V34m0 0c0-6 5-9 11-9 0 6-5 9-11 9zm0 6c0-4-4-7-9-7 0 4 4 7 9 7zM38 50V30m0 0c0-7 5-11 12-11 0 7-5 11-12 11z" opacity=".55"/></svg>
+            <p>Upload a field photo or try a sample to start.</p>
+          </div>
+          <div class="stage" id="stage" hidden>
+            <img id="base" alt="Field">
+            <img class="layer" data-name="heat" alt="" hidden>
+            <img class="layer" data-name="mask" alt="" hidden>
+            <img class="layer" data-name="crop" alt="" hidden>
+            <img class="layer" data-name="weed" alt="" hidden>
+            <canvas id="boxes"></canvas>
+            <div class="tip" id="tip" hidden></div>
+            <div class="scan" id="scan" hidden><div class="scan-line"></div><div class="scan-msg" id="scanMsg">Analyzing…</div></div>
+          </div>
+        </div>
+        <div class="legend">
+          <span><i style="background:#2fa866"></i>Crop</span>
+          <span><i style="background:#e4572e"></i>Weed</span>
+          <span class="muted" id="engineNote"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap results" id="results" hidden>
+    <div class="verdict panel" id="verdict"></div>
+
+    <div class="cards" id="cards"></div>
+
+    <div class="two">
+      <div class="panel">
+        <h2>Crop vs weed cover</h2>
+        <div class="donut-row">
+          <div id="donut"></div>
+          <ul class="donut-legend" id="donutLegend"></ul>
+        </div>
+        <div class="rowinfo" id="rowInfo"></div>
+      </div>
+      <div class="panel">
+        <h2>Spot-spray plan</h2>
+        <p class="sub">Each cell is a section of the field. Red cells contain enough weeds to treat.</p>
+        <div class="spray" id="spray"></div>
+        <div class="spray-foot" id="sprayFoot"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Recommendations</h2>
+      <ul class="recs" id="recs"></ul>
+    </div>
+
+    <div class="panel">
+      <div class="table-head">
+        <h2>Detections <span class="count" id="detCount"></span></h2>
+        <div class="seg small" id="filterSeg">
+          <button data-v="all" class="on">All</button>
+          <button data-v="crop">Crops</button>
+          <button data-v="weed">Weeds</button>
+        </div>
+        <div class="bar-actions">
+          <a class="btn small ghost" id="csvBtn" href="#">Export CSV</a>
+          <a class="btn small ghost" id="jsonBtn" href="#">Export JSON</a>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table id="dets">
+          <thead><tr><th>ID</th><th>Type</th><th>Confidence</th><th>Position</th><th>Size</th><th>Cover</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap" id="history">
+    <div class="section-head">
+      <h2>Scan history</h2>
+      <p class="sub">Every analysis is stored in SQLite so you can reopen it later.</p>
+    </div>
+    <div class="hist" id="hist"></div>
+  </section>
+
+  <section class="wrap how" id="how">
+    <div class="section-head">
+      <h2>How it works</h2>
+      <p class="sub">A transparent computer-vision pipeline — no black box, every step is explainable.</p>
+    </div>
+    <ol class="steps">
+      <li><b>1</b><h3>Segment vegetation</h3><p>The Excess-Green index (2G − R − B) with an adaptive Otsu threshold separates plants from soil, shadows and stones.</p></li>
+      <li><b>2</b><h3>Find the crop rows</h3><p>Plant pixels are projected across every angle; the sharpest periodic pattern gives the row direction and spacing.</p></li>
+      <li><b>3</b><h3>Classify each plant</h3><p>Plants on a row line at the typical crop size are crops. Off-row or undersized plants are weeds.</p></li>
+      <li><b>4</b><h3>Plan the treatment</h3><p>Weed density is gridded into a heat map and spray plan, estimating herbicide saved by treating only affected cells.</p></li>
+    </ol>
+  </section>
+</main>
+
+<footer class="wrap foot">
+  <span>FieldSense · Flask + OpenCV + vanilla JS</span>
+  <span class="muted">Indicative analysis — confirm with field scouting before treatment.</span>
+</footer>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<script src="detector.js"></script>
+<script src="engines.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
