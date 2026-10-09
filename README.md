@@ -3,7 +3,7 @@
 Upload a top-down field photo and FieldSense separates **crops from weeds**, maps where weeds are
 concentrated, rates the weed pressure and estimates how much herbicide **spot-spraying** could save.
 
-**Live demo:** `https://<your-username>.github.io/<repo-name>/` *(after you follow "Publish on GitHub" below)*
+**Live demo:** `https://<your-username>.github.io/<repo-name>/` 
 
 ![screenshot](docs/screenshot.png)
 
